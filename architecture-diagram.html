@@ -1,0 +1,600 @@
+<title>OPS Coordinator Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f3f5f7;
+    --surface: #ffffff;
+    --border: #d7dde3;
+    --ink: #1a2129;
+    --ink-2: #5b6672;
+    --ink-3: #8996a3;
+    --accent: #1c6f74;
+    --accent-soft: #e2f0ef;
+    --accent-2: #9a5b12;
+    --accent-2-soft: #f5ead7;
+    --accent-3: #6a4c93;
+    --accent-3-soft: #ece5f4;
+    --code-bg: #eef1f4;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #10151a;
+      --surface: #171e25;
+      --border: #2b3540;
+      --ink: #e7ebee;
+      --ink-2: #a3aeb9;
+      --ink-3: #74818e;
+      --accent: #5cc6bd;
+      --accent-soft: #17302f;
+      --accent-2: #e2a85c;
+      --accent-2-soft: #33271a;
+      --accent-3: #b79ee0;
+      --accent-3-soft: #251e33;
+      --code-bg: #1d2530;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #10151a;
+    --surface: #171e25;
+    --border: #2b3540;
+    --ink: #e7ebee;
+    --ink-2: #a3aeb9;
+    --ink-3: #74818e;
+    --accent: #5cc6bd;
+    --accent-soft: #17302f;
+    --accent-2: #e2a85c;
+    --accent-2-soft: #33271a;
+    --accent-3: #b79ee0;
+    --accent-3-soft: #251e33;
+    --code-bg: #1d2530;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  .page {
+    max-width: 980px;
+    margin: 0 auto;
+    padding-inline: 20px;
+    padding-block: 40px 64px;
+  }
+
+  header.hero {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 24px;
+    margin-bottom: 32px;
+  }
+
+  .eyebrow {
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 10px;
+  }
+
+  h1 {
+    font-size: clamp(24px, 4vw, 30px);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0 0 10px;
+    text-wrap: balance;
+  }
+
+  .lede {
+    color: var(--ink-2);
+    max-width: 62ch;
+    margin: 0 0 18px;
+    font-size: 14.5px;
+  }
+
+  .stack {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .chip {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11.5px;
+    color: var(--ink-2);
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 4px 11px;
+  }
+
+  h2 {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 0 0 16px;
+  }
+
+  section { margin-bottom: 40px; }
+
+  figure {
+    margin: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 20px 6px;
+  }
+
+  figure svg {
+    width: 100%;
+    height: auto;
+    display: block;
+    font-family: "IBM Plex Sans", sans-serif;
+  }
+
+  figcaption {
+    font-size: 12.5px;
+    color: var(--ink-2);
+    padding: 14px 4px 16px;
+    border-top: 1px solid var(--border);
+    margin-top: 10px;
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    padding: 0 4px 14px;
+    font-size: 12px;
+    color: var(--ink-2);
+  }
+
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+
+  .legend .swatch {
+    width: 22px;
+    height: 0;
+    border-top-width: 2px;
+    border-top-style: solid;
+    display: inline-block;
+  }
+
+  .sw-flow { border-color: var(--ink-3); }
+  .sw-claude { border-color: var(--accent); border-top-style: dashed; }
+  .sw-route { border-color: var(--accent-2); border-top-style: dashed; }
+  .sw-mcp { border-color: var(--accent-3); }
+
+  .badge {
+    display: inline-block;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--accent-3);
+    background: var(--accent-3-soft);
+    border: 1px solid var(--accent-3);
+    border-radius: 999px;
+    padding: 3px 10px;
+    margin-left: 10px;
+    vertical-align: middle;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    font-size: 13.5px;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+
+  thead th {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    background: var(--code-bg);
+  }
+
+  tbody tr:last-child td { border-bottom: none; }
+
+  td code, .lede code {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12.5px;
+    background: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  @media (max-width: 680px) {
+    .two-col { grid-template-columns: 1fr; }
+  }
+
+  pre {
+    margin: 0;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    overflow-x: auto;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--ink);
+  }
+
+  .muted-key { color: var(--ink-3); }
+  .str { color: var(--accent); }
+
+  footer {
+    color: var(--ink-3);
+    font-size: 12px;
+    border-top: 1px solid var(--border);
+    padding-top: 18px;
+  }
+</style>
+
+<div class="page">
+
+  <header class="hero">
+    <p class="eyebrow">System Architecture</p>
+    <h1>OPS Coordinator Multi-Agent System</h1>
+    <p class="lede">
+      A single external endpoint, <code>POST /analyze</code>, hands a free-text ops
+      request to a Claude-driven coordinator. The coordinator is the only component
+      that reasons about routing — everything under it is a plain Python function that
+      makes one independent call to the same Claude API with its own system prompt.
+    </p>
+    <div class="stack">
+      <span class="chip">Python</span>
+      <span class="chip">FastAPI</span>
+      <span class="chip">Anthropic Claude API — claude-sonnet-5</span>
+      <span class="chip">Tool use / agentic loop</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>Request Flow</h2>
+    <figure>
+      <svg viewBox="0 0 1000 560" role="img" aria-label="Diagram: a client sends a POST /analyze request to FastAPI, which passes it to the OPS Coordinator. The coordinator runs a Claude tool-use loop and, per its routing rules, dispatches to ServiceNowAgent, SplunkAgent, and EmailAgent. ServiceNowAgent and SplunkAgent read dummy data before making their own Claude calls; EmailAgent drafts a report from their summaries. The coordinator assembles a final JSON response that flows back through FastAPI to the client.">
+        <defs>
+          <marker id="arrow-flow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--ink-3)"></path>
+          </marker>
+          <marker id="arrow-claude" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"></path>
+          </marker>
+          <marker id="arrow-route" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--accent-2)"></path>
+          </marker>
+        </defs>
+
+        <!-- Client <-> FastAPI -->
+        <line x1="350" y1="64" x2="350" y2="104" stroke="var(--ink-3)" stroke-width="1.4" marker-end="url(#arrow-flow)" marker-start="url(#arrow-flow)"></line>
+        <text x="238" y="88" font-size="11" fill="var(--ink-2)" text-anchor="end">POST /analyze {"request"} →</text>
+        <text x="462" y="88" font-size="11" fill="var(--ink-2)" text-anchor="start">← 200 OK AnalysisResponse</text>
+
+        <!-- FastAPI <-> Coordinator -->
+        <line x1="350" y1="160" x2="350" y2="196" stroke="var(--ink-3)" stroke-width="1.4" marker-end="url(#arrow-flow)" marker-start="url(#arrow-flow)"></line>
+        <text x="238" y="182" font-size="11" fill="var(--ink-2)" text-anchor="end">handle_request(text) →</text>
+        <text x="462" y="182" font-size="11" fill="var(--ink-2)" text-anchor="start">← final JSON</text>
+
+        <!-- Coordinator <-> Claude API -->
+        <line x1="560" y1="242" x2="760" y2="242" stroke="var(--accent)" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arrow-claude)" marker-start="url(#arrow-claude)"></line>
+        <text x="660" y="225" font-size="11" fill="var(--accent)" text-anchor="middle" font-weight="600">tool-use loop · ≤ 6 turns</text>
+        <text x="660" y="260" font-size="10.5" fill="var(--ink-2)" text-anchor="middle">tools + routing rules ⇄ tool_use / tool_result</text>
+
+        <!-- dispatch spine -->
+        <line x1="350" y1="288" x2="350" y2="312" stroke="var(--accent-2)" stroke-width="1.6" stroke-dasharray="5 4"></line>
+        <line x1="170" y1="312" x2="790" y2="312" stroke="var(--accent-2)" stroke-width="1.6" stroke-dasharray="5 4"></line>
+        <line x1="190" y1="312" x2="190" y2="336" stroke="var(--accent-2)" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arrow-route)"></line>
+        <line x1="480" y1="312" x2="480" y2="336" stroke="var(--accent-2)" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arrow-route)"></line>
+        <line x1="770" y1="312" x2="770" y2="336" stroke="var(--accent-2)" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arrow-route)"></line>
+        <text x="300" y="304" font-size="10" fill="var(--accent-2)" text-anchor="middle" font-style="italic">dispatched per routing rules — activation and results both travel this path</text>
+
+        <text x="190" y="328" font-size="10" fill="var(--ink-2)" text-anchor="middle">ticket ID / root cause / SLA</text>
+        <text x="480" y="328" font-size="10" fill="var(--ink-2)" text-anchor="middle">logs only</text>
+        <text x="770" y="328" font-size="10" fill="var(--ink-2)" text-anchor="middle">send / prepare report</text>
+
+        <!-- ServiceNow / Splunk -> dummy_data -->
+        <line x1="190" y1="410" x2="190" y2="428" stroke="var(--ink-3)" stroke-width="1.4" marker-end="url(#arrow-flow)"></line>
+        <text x="200" y="422" font-size="10" fill="var(--ink-2)">get_ticket(id)</text>
+        <line x1="480" y1="410" x2="480" y2="428" stroke="var(--ink-3)" stroke-width="1.4" marker-end="url(#arrow-flow)"></line>
+        <text x="490" y="422" font-size="10" fill="var(--ink-2)">get_logs(service)</text>
+
+        <!-- Client box -->
+        <rect x="230" y="16" width="240" height="48" rx="8" fill="var(--surface)" stroke="var(--border)"></rect>
+        <text x="350" y="36" text-anchor="middle" font-size="13.5" font-weight="600" fill="var(--ink)">Client</text>
+        <text x="350" y="52" text-anchor="middle" font-size="10.5" fill="var(--ink-2)">curl / browser</text>
+
+        <!-- FastAPI box -->
+        <rect x="205" y="104" width="290" height="56" rx="8" fill="var(--surface)" stroke="var(--border)"></rect>
+        <text x="350" y="126" text-anchor="middle" font-size="13.5" font-weight="600" fill="var(--ink)">FastAPI</text>
+        <text x="350" y="144" text-anchor="middle" font-size="11" font-family="IBM Plex Mono, monospace" fill="var(--ink-2)">app/main.py · POST /analyze</text>
+
+        <!-- Coordinator box -->
+        <rect x="140" y="196" width="420" height="92" rx="10" fill="var(--accent-soft)" stroke="var(--accent)"></rect>
+        <text x="350" y="222" text-anchor="middle" font-size="14.5" font-weight="700" fill="var(--ink)">OPS Coordinator</text>
+        <text x="350" y="241" text-anchor="middle" font-size="11" font-family="IBM Plex Mono, monospace" fill="var(--ink-2)">app/coordinator.py</text>
+        <text x="350" y="259" text-anchor="middle" font-size="10.5" fill="var(--ink-2)">owns the routing rules · decides which agents to call</text>
+        <text x="350" y="275" text-anchor="middle" font-size="10.5" fill="var(--ink-2)">assembles the final structured JSON</text>
+
+        <!-- Claude API box -->
+        <rect x="760" y="196" width="200" height="92" rx="10" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.3"></rect>
+        <text x="860" y="222" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)">Claude API</text>
+        <text x="860" y="240" text-anchor="middle" font-size="11" font-family="IBM Plex Mono, monospace" fill="var(--accent)">claude-sonnet-5</text>
+        <text x="860" y="257" text-anchor="middle" font-size="9.5" fill="var(--ink-2)">4 independent calls,</text>
+        <text x="860" y="270" text-anchor="middle" font-size="9.5" fill="var(--ink-2)">4 different system prompts</text>
+
+        <!-- ServiceNowAgent box -->
+        <rect x="60" y="336" width="260" height="74" rx="9" fill="var(--surface)" stroke="var(--border)"></rect>
+        <text x="190" y="358" text-anchor="middle" font-size="13" font-weight="600" fill="var(--ink)">ServiceNowAgent</text>
+        <text x="190" y="375" text-anchor="middle" font-size="10.5" font-family="IBM Plex Mono, monospace" fill="var(--ink-2)">servicenow_agent.py</text>
+        <text x="190" y="392" text-anchor="middle" font-size="10" fill="var(--ink-3)">Claude call + DUMMY_TICKETS</text>
+
+        <!-- SplunkAgent box -->
+        <rect x="350" y="336" width="260" height="74" rx="9" fill="var(--surface)" stroke="var(--border)"></rect>
+        <text x="480" y="358" text-anchor="middle" font-size="13" font-weight="600" fill="var(--ink)">SplunkAgent</text>
+        <text x="480" y="375" text-anchor="middle" font-size="10.5" font-family="IBM Plex Mono, monospace" fill="var(--ink-2)">splunk_agent.py</text>
+        <text x="480" y="392" text-anchor="middle" font-size="10" fill="var(--ink-3)">Claude call + DUMMY_LOGS</text>
+
+        <!-- EmailAgent box -->
+        <rect x="640" y="336" width="260" height="74" rx="9" fill="var(--surface)" stroke="var(--border)"></rect>
+        <text x="770" y="358" text-anchor="middle" font-size="13" font-weight="600" fill="var(--ink)">EmailAgent</text>
+        <text x="770" y="375" text-anchor="middle" font-size="10.5" font-family="IBM Plex Mono, monospace" fill="var(--ink-2)">email_agent.py</text>
+        <text x="770" y="392" text-anchor="middle" font-size="10" fill="var(--ink-3)">Claude call → subject + body JSON</text>
+
+        <!-- dummy_data box -->
+        <rect x="60" y="428" width="550" height="64" rx="9" fill="var(--code-bg)" stroke="var(--border)"></rect>
+        <text x="335" y="454" text-anchor="middle" font-size="12.5" font-weight="600" font-family="IBM Plex Mono, monospace" fill="var(--ink)">dummy_data.py</text>
+        <text x="335" y="472" text-anchor="middle" font-size="10.5" fill="var(--ink-2)">DUMMY_TICKETS · DUMMY_LOGS — simulated ServiceNow / Splunk, with fallbacks for unknown IDs</text>
+      </svg>
+      <div class="legend">
+        <span><i class="swatch sw-flow"></i>direct call / return</span>
+        <span><i class="swatch sw-claude"></i>Claude API call</span>
+        <span><i class="swatch sw-route"></i>conditional dispatch (routing rules)</span>
+      </div>
+      <figcaption>
+        FastAPI hands the raw request to <code>coordinator.py</code>, which runs Claude in a
+        tool-use loop and dispatches to ServiceNow/Splunk/Email sub-agents per the routing
+        rules embedded in its system prompt. Each sub-agent is a plain Python function: it
+        looks up dummy data (where applicable) and makes its own single-turn call to the
+        same Claude API with a role-specific prompt — there is one real AI dependency,
+        called independently up to four times per request.
+      </figcaption>
+    </figure>
+  </section>
+
+  <div class="two-col">
+    <section style="margin-bottom:0">
+      <h2>Routing Rules</h2>
+      <table>
+        <thead>
+          <tr><th>User request mentions&hellip;</th><th>Agents activated</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>"ticket analysis", "incident analysis", "log analysis", "root cause", "SLA", "error details", or a ticket ID</td>
+            <td>ServiceNowAgent + SplunkAgent + EmailAgent</td>
+          </tr>
+          <tr>
+            <td>Only asks for logs</td>
+            <td>SplunkAgent only</td>
+          </tr>
+          <tr>
+            <td>Asks to send / prepare a report</td>
+            <td>EmailAgent (+ whichever agents it needs for content)</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section style="margin-bottom:0">
+      <h2>Response Shape</h2>
+      <pre>{
+  <span class="muted-key">"ticket_summary"</span>: <span class="str">"..."</span>,
+  <span class="muted-key">"log_analysis_summary"</span>: <span class="str">"..."</span>,
+  <span class="muted-key">"recommended_fix"</span>: <span class="str">"..."</span>,
+  <span class="muted-key">"email_report"</span>: {
+    <span class="muted-key">"subject"</span>: <span class="str">"..."</span>,
+    <span class="muted-key">"body"</span>: <span class="str">"..."</span>
+  }
+}</pre>
+    </section>
+  </div>
+
+  <section style="margin-bottom:0">
+    <h2>Component Reference</h2>
+    <table>
+      <thead>
+        <tr><th>Component</th><th>File</th><th>Role</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>FastAPI app</td><td><code>app/main.py</code></td><td>Exposes <code>POST /analyze</code>; validates request/response shape</td></tr>
+        <tr><td>OPS Coordinator</td><td><code>app/coordinator.py</code></td><td>Runs the Claude tool-use loop; owns the routing-rules system prompt; assembles the final JSON</td></tr>
+        <tr><td>ServiceNowAgent</td><td><code>app/agents/servicenow_agent.py</code></td><td>Looks up a dummy ticket, asks Claude to summarize priority / SLA / affected service</td></tr>
+        <tr><td>SplunkAgent</td><td><code>app/agents/splunk_agent.py</code></td><td>Looks up dummy logs, asks Claude for an error pattern and root-cause hypothesis</td></tr>
+        <tr><td>EmailAgent</td><td><code>app/agents/email_agent.py</code></td><td>Asks Claude to draft a subject + body incident report from the other summaries</td></tr>
+        <tr><td>Dummy data</td><td><code>data/dummy_data.py</code></td><td><code>DUMMY_TICKETS</code> / <code>DUMMY_LOGS</code>, with a generic fallback for unknown IDs</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Target Architecture — Real ServiceNow / Splunk / Email <span class="badge">Not yet implemented</span></h2>
+    <p class="lede" style="font-size:13px; margin-bottom:16px">
+      The code today reads <code>data/dummy_data.py</code>. This is the intended design for
+      swapping those lookups for live systems: each sub-agent keeps its own Claude call, but
+      trades its dummy-data lookup for a call through an MCP client to a dedicated MCP server —
+      ServiceNow and Splunk MCP servers, plus an email-sending MCP server (e.g. Gmail).
+    </p>
+    <figure>
+      <svg viewBox="0 0 1000 600" role="img" aria-label="Diagram: the same OPS Coordinator and sub-agents as the current implementation, but ServiceNowAgent and SplunkAgent now call an MCP client to a ServiceNow MCP server and a Splunk MCP server respectively, which in turn call the real ServiceNow and Splunk instances. EmailAgent still drafts the email with Claude, then calls an Email MCP server to actually send it to the recipient's inbox.">
+        <defs>
+          <marker id="arrow-flow-2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--ink-3)"></path>
+          </marker>
+          <marker id="arrow-claude-2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"></path>
+          </marker>
+          <marker id="arrow-route-2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--accent-2)"></path>
+          </marker>
+          <marker id="arrow-mcp" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--accent-3)"></path>
+          </marker>
+        </defs>
+
+        <!-- Client <-> FastAPI -->
+        <line x1="350" y1="64" x2="350" y2="104" stroke="var(--ink-3)" stroke-width="1.4" marker-end="url(#arrow-flow-2)" marker-start="url(#arrow-flow-2)"></line>
+        <text x="238" y="88" font-size="11" fill="var(--ink-2)" text-anchor="end">POST /analyze {"request"} →</text>
+        <text x="462" y="88" font-size="11" fill="var(--ink-2)" text-anchor="start">← 200 OK AnalysisResponse</text>
+
+        <!-- FastAPI <-> Coordinator -->
+        <line x1="350" y1="160" x2="350" y2="196" stroke="var(--ink-3)" stroke-width="1.4" marker-end="url(#arrow-flow-2)" marker-start="url(#arrow-flow-2)"></line>
+        <text x="238" y="182" font-size="11" fill="var(--ink-2)" text-anchor="end">handle_request(text) →</text>
+        <text x="462" y="182" font-size="11" fill="var(--ink-2)" text-anchor="start">← final JSON</text>
+
+        <!-- Coordinator <-> Claude API -->
+        <line x1="560" y1="242" x2="760" y2="242" stroke="var(--accent)" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arrow-claude-2)" marker-start="url(#arrow-claude-2)"></line>
+        <text x="660" y="225" font-size="11" fill="var(--accent)" text-anchor="middle" font-weight="600">tool-use loop · ≤ 6 turns</text>
+        <text x="660" y="260" font-size="10.5" fill="var(--ink-2)" text-anchor="middle">tools + routing rules ⇄ tool_use / tool_result</text>
+
+        <!-- dispatch spine -->
+        <line x1="350" y1="288" x2="350" y2="312" stroke="var(--accent-2)" stroke-width="1.6" stroke-dasharray="5 4"></line>
+        <line x1="170" y1="312" x2="790" y2="312" stroke="var(--accent-2)" stroke-width="1.6" stroke-dasharray="5 4"></line>
+        <line x1="190" y1="312" x2="190" y2="336" stroke="var(--accent-2)" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arrow-route-2)"></line>
+        <line x1="480" y1="312" x2="480" y2="336" stroke="var(--accent-2)" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arrow-route-2)"></line>
+        <line x1="770" y1="312" x2="770" y2="336" stroke="var(--accent-2)" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arrow-route-2)"></line>
+        <text x="300" y="304" font-size="10" fill="var(--accent-2)" text-anchor="middle" font-style="italic">dispatched per routing rules</text>
+
+        <text x="190" y="328" font-size="10" fill="var(--ink-2)" text-anchor="middle">ticket ID / root cause / SLA</text>
+        <text x="480" y="328" font-size="10" fill="var(--ink-2)" text-anchor="middle">logs only</text>
+        <text x="770" y="328" font-size="10" fill="var(--ink-2)" text-anchor="middle">send / prepare report</text>
+
+        <!-- Agents -> MCP servers -->
+        <line x1="190" y1="410" x2="190" y2="436" stroke="var(--accent-3)" stroke-width="1.6" marker-end="url(#arrow-mcp)"></line>
+        <text x="200" y="426" font-size="10" fill="var(--accent-3)">get_ticket via MCP</text>
+        <line x1="480" y1="410" x2="480" y2="436" stroke="var(--accent-3)" stroke-width="1.6" marker-end="url(#arrow-mcp)"></line>
+        <text x="490" y="426" font-size="10" fill="var(--accent-3)">search via MCP</text>
+        <line x1="770" y1="410" x2="770" y2="436" stroke="var(--accent-3)" stroke-width="1.6" marker-end="url(#arrow-mcp)"></line>
+        <text x="780" y="426" font-size="10" fill="var(--accent-3)">send_email via MCP</text>
+
+        <!-- MCP servers -> real systems -->
+        <line x1="190" y1="490" x2="190" y2="518" stroke="var(--ink-3)" stroke-width="1.4" marker-end="url(#arrow-flow-2)"></line>
+        <line x1="480" y1="490" x2="480" y2="518" stroke="var(--ink-3)" stroke-width="1.4" marker-end="url(#arrow-flow-2)"></line>
+        <line x1="770" y1="490" x2="770" y2="518" stroke="var(--ink-3)" stroke-width="1.4" marker-end="url(#arrow-flow-2)"></line>
+
+        <!-- Client box -->
+        <rect x="230" y="16" width="240" height="48" rx="8" fill="var(--surface)" stroke="var(--border)"></rect>
+        <text x="350" y="36" text-anchor="middle" font-size="13.5" font-weight="600" fill="var(--ink)">Client</text>
+        <text x="350" y="52" text-anchor="middle" font-size="10.5" fill="var(--ink-2)">curl / browser</text>
+
+        <!-- FastAPI box -->
+        <rect x="205" y="104" width="290" height="56" rx="8" fill="var(--surface)" stroke="var(--border)"></rect>
+        <text x="350" y="126" text-anchor="middle" font-size="13.5" font-weight="600" fill="var(--ink)">FastAPI</text>
+        <text x="350" y="144" text-anchor="middle" font-size="11" font-family="IBM Plex Mono, monospace" fill="var(--ink-2)">app/main.py · POST /analyze</text>
+
+        <!-- Coordinator box -->
+        <rect x="140" y="196" width="420" height="92" rx="10" fill="var(--accent-soft)" stroke="var(--accent)"></rect>
+        <text x="350" y="222" text-anchor="middle" font-size="14.5" font-weight="700" fill="var(--ink)">OPS Coordinator</text>
+        <text x="350" y="241" text-anchor="middle" font-size="11" font-family="IBM Plex Mono, monospace" fill="var(--ink-2)">app/coordinator.py</text>
+        <text x="350" y="259" text-anchor="middle" font-size="10.5" fill="var(--ink-2)">owns the routing rules · decides which agents to call</text>
+        <text x="350" y="275" text-anchor="middle" font-size="10.5" fill="var(--ink-2)">unchanged from the current implementation</text>
+
+        <!-- Claude API box -->
+        <rect x="760" y="196" width="200" height="92" rx="10" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.3"></rect>
+        <text x="860" y="222" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)">Claude API</text>
+        <text x="860" y="240" text-anchor="middle" font-size="11" font-family="IBM Plex Mono, monospace" fill="var(--accent)">claude-sonnet-5</text>
+        <text x="860" y="257" text-anchor="middle" font-size="9.5" fill="var(--ink-2)">4 independent calls,</text>
+        <text x="860" y="270" text-anchor="middle" font-size="9.5" fill="var(--ink-2)">4 different system prompts</text>
+
+        <!-- ServiceNowAgent box -->
+        <rect x="60" y="336" width="260" height="74" rx="9" fill="var(--surface)" stroke="var(--border)"></rect>
+        <text x="190" y="358" text-anchor="middle" font-size="13" font-weight="600" fill="var(--ink)">ServiceNowAgent</text>
+        <text x="190" y="375" text-anchor="middle" font-size="10.5" font-family="IBM Plex Mono, monospace" fill="var(--ink-2)">servicenow_agent.py</text>
+        <text x="190" y="392" text-anchor="middle" font-size="10" fill="var(--ink-3)">Claude call + MCP lookup</text>
+
+        <!-- SplunkAgent box -->
+        <rect x="350" y="336" width="260" height="74" rx="9" fill="var(--surface)" stroke="var(--border)"></rect>
+        <text x="480" y="358" text-anchor="middle" font-size="13" font-weight="600" fill="var(--ink)">SplunkAgent</text>
+        <text x="480" y="375" text-anchor="middle" font-size="10.5" font-family="IBM Plex Mono, monospace" fill="var(--ink-2)">splunk_agent.py</text>
+        <text x="480" y="392" text-anchor="middle" font-size="10" fill="var(--ink-3)">Claude call + MCP lookup</text>
+
+        <!-- EmailAgent box -->
+        <rect x="640" y="336" width="260" height="74" rx="9" fill="var(--surface)" stroke="var(--border)"></rect>
+        <text x="770" y="358" text-anchor="middle" font-size="13" font-weight="600" fill="var(--ink)">EmailAgent</text>
+        <text x="770" y="375" text-anchor="middle" font-size="10.5" font-family="IBM Plex Mono, monospace" fill="var(--ink-2)">email_agent.py</text>
+        <text x="770" y="392" text-anchor="middle" font-size="10" fill="var(--ink-3)">Claude drafts, then MCP sends</text>
+
+        <!-- MCP server boxes -->
+        <rect x="60" y="436" width="260" height="54" rx="9" fill="var(--accent-3-soft)" stroke="var(--accent-3)"></rect>
+        <text x="190" y="468" text-anchor="middle" font-size="12" font-weight="600" fill="var(--ink)">ServiceNow MCP Server</text>
+
+        <rect x="350" y="436" width="260" height="54" rx="9" fill="var(--accent-3-soft)" stroke="var(--accent-3)"></rect>
+        <text x="480" y="468" text-anchor="middle" font-size="12" font-weight="600" fill="var(--ink)">Splunk MCP Server</text>
+
+        <rect x="640" y="436" width="260" height="54" rx="9" fill="var(--accent-3-soft)" stroke="var(--accent-3)"></rect>
+        <text x="770" y="462" text-anchor="middle" font-size="12" font-weight="600" fill="var(--ink)">Email MCP Server</text>
+        <text x="770" y="477" text-anchor="middle" font-size="9.5" fill="var(--ink-2)">e.g. Gmail</text>
+
+        <!-- Real system boxes (external, dashed) -->
+        <rect x="60" y="518" width="260" height="46" rx="9" fill="var(--surface)" stroke="var(--ink-3)" stroke-dasharray="4 3"></rect>
+        <text x="190" y="546" text-anchor="middle" font-size="11" fill="var(--ink-2)">Real ServiceNow instance</text>
+
+        <rect x="350" y="518" width="260" height="46" rx="9" fill="var(--surface)" stroke="var(--ink-3)" stroke-dasharray="4 3"></rect>
+        <text x="480" y="546" text-anchor="middle" font-size="11" fill="var(--ink-2)">Real Splunk instance</text>
+
+        <rect x="640" y="518" width="260" height="46" rx="9" fill="var(--surface)" stroke="var(--ink-3)" stroke-dasharray="4 3"></rect>
+        <text x="770" y="546" text-anchor="middle" font-size="11" fill="var(--ink-2)">Recipient inbox</text>
+      </svg>
+      <div class="legend">
+        <span><i class="swatch sw-flow"></i>direct call / return</span>
+        <span><i class="swatch sw-claude"></i>Claude API call</span>
+        <span><i class="swatch sw-route"></i>conditional dispatch (routing rules)</span>
+        <span><i class="swatch sw-mcp"></i>MCP client call</span>
+      </div>
+      <figcaption>
+        Same coordinator, same routing rules, same final JSON contract — only the sub-agents'
+        data source changes. <code>servicenow_agent.py</code> and <code>splunk_agent.py</code>
+        swap their <code>dummy_data</code> lookup for an MCP client call to a ServiceNow MCP
+        server and a Splunk MCP server; <code>email_agent.py</code> keeps drafting the
+        subject/body with Claude, then calls an Email MCP server to actually send it, instead
+        of only returning it in the response. Dashed-border boxes are real external systems,
+        outside this codebase.
+      </figcaption>
+    </figure>
+  </section>
+
+  <footer>
+    Max 6 tool-use turns per request (<code>MAX_TURNS</code> in <code>coordinator.py</code>); a
+    malformed final reply from Claude falls back to a best-effort response instead of a 500.
+  </footer>
+
+</div>

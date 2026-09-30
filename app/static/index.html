@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OPS Support Coordinator</title>
+<meta name="description" content="Chat-based IT ops assistant: describe a ticket, service, or incident and get a ServiceNow summary, Splunk root-cause analysis, and a draft email report.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #eaeef2;
+    --surface: #ffffff;
+    --surface-2: #f5f7f9;
+    --border: #d7dde3;
+    --ink: #1a2129;
+    --ink-2: #5b6672;
+    --ink-3: #8996a3;
+    --accent: #196a70;
+    --accent-2: #0e4d52;
+    --accent-ink: #ffffff;
+    --accent-soft: #e2f0ef;
+    --success: #2f8f5b;
+    --bubble-user: linear-gradient(155deg, #1c767c, #0e4d52);
+    --bubble-user-ink: #ffffff;
+    --bubble-bot: #ffffff;
+    --danger: #a33636;
+    --danger-soft: #fbebeb;
+    --shadow: 0 1px 2px rgba(20, 30, 35, 0.06), 0 1px 1px rgba(20, 30, 35, 0.04);
+    --shadow-lg: 0 8px 24px rgba(20, 40, 45, 0.10), 0 2px 6px rgba(20, 40, 45, 0.06);
+    --glow-1: rgba(28, 118, 124, 0.12);
+    --glow-2: rgba(28, 118, 124, 0.05);
+    --chrome-bg: rgba(255, 255, 255, 0.82);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b0f12;
+      --surface: #171e25;
+      --surface-2: #1c242c;
+      --border: #2b3540;
+      --ink: #e7ebee;
+      --ink-2: #a3aeb9;
+      --ink-3: #74818e;
+      --accent: #5cc6bd;
+      --accent-2: #3a938c;
+      --accent-ink: #06201e;
+      --accent-soft: #17302f;
+      --success: #4fbf83;
+      --bubble-user: linear-gradient(155deg, #328d84, #1c6b66);
+      --bubble-user-ink: #f2fbfa;
+      --bubble-bot: #1c242c;
+      --danger: #e08080;
+      --danger-soft: #3a1f1f;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 1px rgba(0, 0, 0, 0.2);
+      --shadow-lg: 0 10px 28px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
+      --glow-1: rgba(92, 198, 189, 0.14);
+      --glow-2: rgba(92, 198, 189, 0.05);
+      --chrome-bg: rgba(23, 30, 37, 0.75);
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    background:
+      radial-gradient(ellipse 900px 460px at 50% -12%, var(--glow-1), transparent 60%),
+      radial-gradient(ellipse 700px 500px at 100% 100%, var(--glow-2), transparent 55%),
+      var(--bg);
+    background-attachment: fixed;
+    color: var(--ink);
+    font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 14px;
+    line-height: 1.55;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---------- Header (single inline bar) ---------- */
+
+  header {
+    flex: none;
+    background: var(--chrome-bg);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    z-index: 2;
+  }
+
+  .header-inner {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .avatar {
+    flex: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .avatar.bot {
+    background: linear-gradient(155deg, var(--accent), var(--accent-2));
+    color: var(--accent-ink);
+    box-shadow: 0 2px 6px var(--glow-1);
+  }
+
+  .avatar.user {
+    background: var(--surface-2);
+    color: var(--ink-2);
+    border: 1px solid var(--border);
+  }
+
+  .brand-text {
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .brand-title {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+
+  .brand-tagline {
+    font-size: 12px;
+    color: var(--ink-3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .status {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    color: var(--ink-3);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 4px 10px 4px 8px;
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+    animation: pulse 2.4s infinite ease-in-out;
+  }
+
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 3px var(--accent-soft); }
+    50% { box-shadow: 0 0 0 5px var(--accent-soft); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .status-dot { animation: none; }
+  }
+
+  @media (max-width: 560px) {
+    .brand-tagline { display: none; }
+    .status span:last-child { display: none; }
+  }
+
+  /* ---------- Chat area ---------- */
+
+  main {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    scroll-behavior: smooth;
+  }
+
+  .thread {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 22px 20px;
+  }
+
+  .msg-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .msg-row.user { justify-content: flex-end; }
+  .msg-row.bot { justify-content: flex-start; }
+
+  .msg-row .avatar { width: 26px; height: 26px; font-size: 10.5px; }
+
+  .bubble {
+    position: relative;
+    max-width: 74%;
+    padding: 12px 15px;
+    border-radius: 16px;
+    white-space: pre-wrap;
+    font-size: 13.5px;
+  }
+
+  .msg-row.user .bubble {
+    background: var(--bubble-user);
+    color: var(--bubble-user-ink);
+    border-bottom-right-radius: 4px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .msg-row.user .bubble::after {
+    content: "";
+    position: absolute;
+    right: -6px;
+    bottom: 0;
+    width: 12px;
+    height: 12px;
+    background: var(--accent-2);
+    clip-path: polygon(0 0, 0% 100%, 100% 100%);
+  }
+
+  .msg-row.bot .bubble {
+    background: var(--bubble-bot);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-lg);
+    border-bottom-left-radius: 4px;
+  }
+
+  .msg-row.bot .bubble::after {
+    content: "";
+    position: absolute;
+    left: -6px;
+    bottom: 0;
+    width: 12px;
+    height: 12px;
+    background: var(--bubble-bot);
+    clip-path: polygon(100% 0, 0% 100%, 100% 100%);
+  }
+
+  .msg-row.bot .bubble.error {
+    background: var(--danger-soft);
+    border-color: var(--danger);
+    color: var(--danger);
+    box-shadow: none;
+  }
+
+  .msg-row.bot .bubble.error::after { background: var(--danger-soft); border-color: var(--danger); }
+
+  .bubble h3 {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 12px 0 4px;
+  }
+
+  .bubble h3:first-child { margin-top: 0; }
+
+  .bubble .email-subject {
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .bubble .email-status {
+    margin-top: 8px;
+    font-size: 11.5px;
+    font-weight: 600;
+  }
+
+  .bubble .email-status.sent { color: var(--success); }
+  .bubble .email-status.failed { color: var(--ink-3); }
+
+  .bubble .tip-list {
+    margin: 6px 0 0;
+    padding-left: 18px;
+  }
+
+  .bubble .tip-list li { margin-bottom: 3px; }
+
+  .bubble code {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 5px;
+  }
+
+  .typing {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    padding: 4px 0;
+  }
+
+  .typing span {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ink-3);
+    animation: bounce 1.2s infinite ease-in-out;
+  }
+
+  .typing span:nth-child(2) { animation-delay: 0.15s; }
+  .typing span:nth-child(3) { animation-delay: 0.3s; }
+
+  @keyframes bounce {
+    0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
+    40% { transform: translateY(-4px); opacity: 1; }
+  }
+
+  /* ---------- Footer / composer ---------- */
+
+  footer {
+    flex: none;
+    background: var(--chrome-bg);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-top: 1px solid var(--border);
+  }
+
+  .footer-inner {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 12px 20px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .examples {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-bottom: 10px;
+  }
+
+  .example-btn {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    color: var(--ink-2);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 5px 11px;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+    transition: transform 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+  }
+
+  .example-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .composer {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    padding: 6px 6px 6px 16px;
+    box-shadow: var(--shadow);
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  .composer:focus-within {
+    border-color: var(--accent);
+    box-shadow: var(--shadow-lg), 0 0 0 3px var(--accent-soft);
+  }
+
+  textarea#chat-input {
+    flex: 1;
+    resize: none;
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--ink);
+    background: transparent;
+    border: none;
+    outline: none;
+    padding: 8px 0;
+    max-height: 120px;
+  }
+
+  textarea#chat-input::placeholder { color: var(--ink-3); }
+
+  button#send-btn {
+    flex: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: linear-gradient(155deg, var(--accent), var(--accent-2));
+    color: var(--accent-ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 8px var(--glow-1);
+    transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s;
+  }
+
+  button#send-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px var(--glow-1);
+  }
+
+  button#send-btn:disabled { opacity: 0.5; cursor: progress; box-shadow: none; }
+  button#send-btn svg { width: 16px; height: 16px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="brand">
+      <div class="avatar bot">OC</div>
+      <div class="brand-text">
+        <span class="brand-title">OPS Support Coordinator</span>
+        <span class="brand-tagline">Ticket, log &amp; incident report assistant</span>
+      </div>
+    </div>
+    <div class="status">
+      <span class="status-dot"></span>
+      <span>claude-sonnet-5</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="thread" id="chat"></div>
+</main>
+
+<footer>
+  <div class="footer-inner">
+    <div class="examples" id="examples">
+      <button type="button" class="example-btn" data-text="Do a root cause analysis on ticket INC0012345 and email me the report">Root cause on INC0012345</button>
+      <button type="button" class="example-btn" data-text="Just show me the splunk logs for payment-service">Logs for payment-service</button>
+      <button type="button" class="example-btn" data-text="Send the incident report for INC0012345 to ops-team@example.com">Email INC0012345 to ops-team@example.com</button>
+      <button type="button" class="example-btn" data-text="What's the SLA status and root cause for INC0014205?">SLA + root cause on INC0014205</button>
+      <button type="button" class="example-btn" data-text="Show me the splunk logs for search-service">Logs for search-service</button>
+    </div>
+    <form id="chat-form">
+      <div class="composer">
+        <textarea id="chat-input" rows="1" placeholder="Message the coordinator..."></textarea>
+        <button type="submit" id="send-btn" aria-label="Send message">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+        </button>
+      </div>
+    </form>
+  </div>
+</footer>
+
+<script>
+  const chat = document.getElementById('chat');
+  const form = document.getElementById('chat-form');
+  const input = document.getElementById('chat-input');
+  const sendBtn = document.getElementById('send-btn');
+  const examples = document.getElementById('examples');
+
+  function scrollToBottom() {
+    chat.parentElement.scrollTop = chat.parentElement.scrollHeight;
+  }
+
+  function makeAvatar(kind) {
+    const el = document.createElement('div');
+    el.className = `avatar ${kind}`;
+    el.textContent = kind === 'bot' ? 'OC' : 'Y';
+    return el;
+  }
+
+  function addUserMessage(text) {
+    const row = document.createElement('div');
+    row.className = 'msg-row user';
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = text;
+    row.appendChild(bubble);
+    row.appendChild(makeAvatar('user'));
+    chat.appendChild(row);
+    scrollToBottom();
+  }
+
+  function addTypingIndicator() {
+    const row = document.createElement('div');
+    row.className = 'msg-row bot';
+    row.id = 'typing-row';
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+    row.appendChild(makeAvatar('bot'));
+    row.appendChild(bubble);
+    chat.appendChild(row);
+    scrollToBottom();
+    return row;
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function addBotBubble(innerHtml) {
+    const row = document.createElement('div');
+    row.className = 'msg-row bot';
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.innerHTML = innerHtml;
+    row.appendChild(makeAvatar('bot'));
+    row.appendChild(bubble);
+    chat.appendChild(row);
+    scrollToBottom();
+  }
+
+  function addWelcomeMessage() {
+    addBotBubble(`
+      Hi, I'm the <strong>OPS Support Coordinator</strong>. Describe an incident, a ticket ID,
+      or a service name and I'll decide whether to pull the ServiceNow ticket, run a Splunk
+      log analysis, draft an incident email &mdash; or all three.
+      <ul class="tip-list">
+        <li>Try a ticket like <code>INC0012345</code> or <code>INC0014205</code></li>
+        <li>Ask about a service, e.g. "logs for search-service"</li>
+        <li>Give an email address to actually send the report</li>
+      </ul>
+    `);
+  }
+
+  function addBotMessage(data) {
+    const parts = [];
+    if (data.ticket_summary && data.ticket_summary !== 'Not requested.') {
+      parts.push(`<h3>Ticket Summary</h3>${escapeHtml(data.ticket_summary)}`);
+    }
+    if (data.log_analysis_summary && data.log_analysis_summary !== 'Not requested.') {
+      parts.push(`<h3>Log Analysis</h3>${escapeHtml(data.log_analysis_summary)}`);
+    }
+    if (data.recommended_fix && data.recommended_fix !== 'Not requested.') {
+      parts.push(`<h3>Recommended Fix</h3>${escapeHtml(data.recommended_fix)}`);
+    }
+    if (data.email_report && data.email_report.subject && data.email_report.subject !== 'Not requested.') {
+      const er = data.email_report;
+      let status;
+      if (er.sent) {
+        status = `<div class="email-status sent">✓ Sent to ${escapeHtml(er.recipient)}</div>`;
+      } else if (er.recipient) {
+        status = `<div class="email-status failed">✗ Not sent to ${escapeHtml(er.recipient)} — ${escapeHtml(er.error || 'unknown error')}</div>`;
+      } else {
+        status = `<div class="email-status failed">✗ Drafted only — no recipient email address was given</div>`;
+      }
+      parts.push(
+        `<h3>Email Report</h3><div class="email-subject">${escapeHtml(er.subject)}</div>${escapeHtml(er.body || '')}${status}`
+      );
+    }
+
+    addBotBubble(parts.length ? parts.join('') : escapeHtml(JSON.stringify(data, null, 2)));
+  }
+
+  function addErrorMessage(message) {
+    const row = document.createElement('div');
+    row.className = 'msg-row bot';
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble error';
+    bubble.textContent = message;
+    row.appendChild(makeAvatar('bot'));
+    row.appendChild(bubble);
+    chat.appendChild(row);
+    scrollToBottom();
+  }
+
+  async function sendMessage(text) {
+    if (!text.trim()) return;
+
+    addUserMessage(text);
+    input.value = '';
+    input.style.height = 'auto';
+    sendBtn.disabled = true;
+    const typingRow = addTypingIndicator();
+
+    try {
+      const response = await fetch('/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ request: text }),
+      });
+      const data = await response.json();
+      typingRow.remove();
+
+      if (!response.ok) {
+        throw new Error(data.detail || `Request failed with status ${response.status}`);
+      }
+      addBotMessage(data);
+    } catch (err) {
+      typingRow.remove();
+      addErrorMessage(err.message || 'Something went wrong calling the coordinator.');
+    } finally {
+      sendBtn.disabled = false;
+      input.focus();
+    }
+  }
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    sendMessage(input.value);
+  });
+
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      sendMessage(input.value);
+    }
+  });
+
+  input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+  });
+
+  examples.addEventListener('click', (event) => {
+    const btn = event.target.closest('.example-btn');
+    if (!btn) return;
+    sendMessage(btn.dataset.text);
+  });
+
+  addWelcomeMessage();
+</script>
+</body>
+</html>
