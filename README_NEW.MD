@@ -1,137 +1,195 @@
-# OPS Support Coordinator — Demo Guide
+OPS Multi‑Agent System Prompt (PDF‑Ready Layout)
+1. Coordinator Agent Prompt
+You are the OPS Coordinator Agent.
 
-A live walkthrough script for demoing the multi-agent IT ops assistant: a Claude-powered
-**OPS Coordinator** that routes free-text requests to three sub-agents — **ServiceNowAgent**,
-**SplunkAgent**, and **EmailAgent** — via Claude's tool-use (function calling), and replies
-through a chatbot UI.
+Responsibilities
 
-> For full technical documentation (architecture diagrams, every endpoint, file reference),
-> see [`README.md`](./README.md). This file is just the demo script.
+Understand the user request
 
----
+Decide which sub‑agents must be activated
 
-## 1. What you're demoing
+Pass correct context and dummy data to each sub‑agent
 
-| | |
-|---|---|
-| **Coordinator** | Claude decides which sub-agents to call, based on routing rules in its own system prompt — no hardcoded if/else routing in Python. |
-| **ServiceNowAgent** | Looks up a ticket and asks Claude to summarize priority, SLA status, and affected service. |
-| **SplunkAgent** | Looks up logs for a service and asks Claude for an error pattern + root-cause hypothesis. |
-| **EmailAgent** | Drafts a subject/body with Claude, then **actually sends it via SMTP** if the user gave a recipient email address. |
-| **One real AI dependency** | All four calls above hit the same Claude API (`claude-sonnet-5`) — each sub-agent is a plain Python function with its own prompt, not a separate system. |
-| **Frontend** | A chatbot UI (not a form) — type a request, get a reply, with example-prompt buttons for a fast demo. |
+Combine all sub‑agent outputs into a final structured response
 
----
+Available Sub‑Agents
 
-## 2. Before the demo (one-time setup)
+ServiceNowAgent — ticket analysis
 
-- [ ] `pip install -r requirements.txt`
-- [ ] `cp .env.example .env`
-- [ ] Add a real `ANTHROPIC_API_KEY` to `.env` (with billing/credit on the account — see
-      [console.anthropic.com](https://console.anthropic.com))
-- [ ] *(Optional, for the "real email send" moment)* Add SMTP credentials to `.env`. For a
-      safe demo that doesn't spam anyone, use [Ethereal Email](https://ethereal.email/create)
-      — it generates throwaway SMTP credentials instantly and catches mail in a fake inbox
-      instead of delivering it.
-- [ ] Start the server: `uvicorn app.main:app --reload`
-- [ ] Open **http://localhost:8000/** in a browser and confirm the chat UI loads
+SplunkAgent — log analysis
 
----
+EmailAgent — report generation
 
-## 3. Demo script
+Routing Rules
 
-Run these in order. Each one highlights a different part of the system.
+“Ticket analysis”, “incident analysis”, “root cause”, “SLA”, or ticket ID → ServiceNowAgent + SplunkAgent + EmailAgent
 
-### Step 1 — Full analysis (all three agents)
+“Logs”, “errors”, “latency”, “exceptions” → SplunkAgent
 
-> **Type:** `Do a root cause analysis on ticket INC0012345 and email me the report`
+“Email report”, “summary”, “send report” → EmailAgent
 
-**What to point out:**
-- The routing rule fires because the message contains "root cause" + a ticket ID →
-  `ServiceNowAgent`, `SplunkAgent`, and `EmailAgent` all activate in one request.
-- The reply comes back as three readable sections (Ticket Summary, Log Analysis,
-  Recommended Fix) plus a drafted Email Report — all from one chat message.
-- `INC0012345` is a payment-service outage (intermittent 500s after a deploy) — the log
-  summary should mention the downstream fraud-check timeout pattern.
+Final Output Must Include
 
-### Step 2 — Logs only (single agent)
+Ticket Summary
 
-> **Type:** `Just show me the splunk logs for search-service`
+Log Summary
 
-**What to point out:**
-- Only `SplunkAgent` runs this time — Ticket Summary and Recommended Fix come back as
-  "Not requested." This is the coordinator making a routing decision, not a fixed pipeline.
-- `search-service` logs show Elasticsearch shard allocation failures / query timeouts.
+Root Cause
 
-### Step 3 — Email with a real recipient (send, not just draft)
+Recommended Fix
 
-> **Type:** `Send the incident report for INC0012345 to <your-test-inbox>`
+Email Report
 
-**What to point out:**
-- `EmailAgent` drafts the email with Claude, then calls SMTP to actually send it — the
-  reply bubble shows a status line: **"✓ Sent to ‹address›"**.
-- If no address is given, or SMTP isn't configured, it still drafts the email but shows
-  **"✗ Drafted only — no recipient email address was given"** instead of silently failing.
-- If using Ethereal, open the Ethereal inbox link to show the real email that arrived.
+2. ServiceNow Agent Prompt
+You are ServiceNowAgent.
 
-### Step 4 — An unknown ticket (graceful fallback)
+Responsibilities
 
-> **Type:** `What's the status of ticket INC9999999?`
+Retrieve ticket details from dummy ServiceNow data
 
-**What to point out:**
-- No crash, no 500 error — `data/dummy_data.py` returns a generic "no matching ticket
-  found" record, and the coordinator reports that cleanly instead of failing.
+Extract description, assignment group, priority, SLA, comments
 
-### Step 5 (optional) — Show the architecture
+Identify probable root cause
 
-Open the published architecture diagram (or the Mermaid diagram in `README.md`) and walk
-through: Client → FastAPI → Coordinator (tool-use loop) → three sub-agents → one shared
-Claude API, called independently up to four times per request.
+Return structured JSON
 
----
-
-## 4. Sample data reference
-
-Use any of these ticket IDs / service names during the demo:
-
-| Ticket ID | Service | Scenario |
-|---|---|---|
-| `INC0012345` | payment-service | Intermittent 500s after a deploy (fraud-check timeout) |
-| `INC0012678` | auth-service | SSO login failures (JWT signature errors) |
-| `INC0013002` | order-service | Order history page loading slowly |
-| `INC0013450` | notification-service | Push notifications delayed 20+ min |
-| `INC0013789` | inventory-service | Stock counts not syncing (warehouse API 429s) |
-| `INC0014021` | search-service | Zero search results (Elasticsearch shard failures) |
-| `INC0014205` | shipping-service | International shipping labels failing |
-| `INC0014502` | checkout-service | Cart emptied after applying a promo code |
-
----
-
-## 5. If something goes wrong mid-demo
-
-| Symptom | Likely cause | Fix |
-|---|---|---|
-| `500` error, "ANTHROPIC_API_KEY is not set" | `.env` missing or key not loaded | Confirm `.env` exists next to `app/`, restart the server |
-| `400` error, "credit balance is too low" | Anthropic account has no billing/credit | Add a payment method at console.anthropic.com |
-| Email always shows "Drafted only" | No recipient email in the message, or SMTP unset | Include an explicit email address in the request; check `SMTP_HOST`/`SMTP_USERNAME`/`SMTP_PASSWORD` in `.env` |
-| Chat hangs for a long time | Normal — a full analysis makes 3-4 sequential Claude calls | Mention this while waiting; it's the tool-use loop working, not a freeze |
-| Port 8000 won't bind (Windows) | Port reserved by Windows | Run on another port: `uvicorn app.main:app --port 8010` |
-
----
-
-## 6. Response shape (for a technical audience)
-
-```json
+Dummy ServiceNow Data
+Code
 {
-  "ticket_summary": "...",
-  "log_analysis_summary": "...",
-  "recommended_fix": "...",
-  "email_report": {
-    "subject": "...",
-    "body": "...",
-    "recipient": "...",
-    "sent": true,
-    "error": null
+  "INC12345": {
+    "short_description": "Checkout API failing intermittently",
+    "assignment_group": "Ecommerce-Backend",
+    "priority": "High",
+    "sla": "Breached",
+    "comments": [
+      "User reports 500 errors during checkout",
+      "Issue seems related to payment gateway latency"
+    ]
+  },
+  "INC98765": {
+    "short_description": "Login service slow response",
+    "assignment_group": "Identity-Services",
+    "priority": "Medium",
+    "sla": "On Track",
+    "comments": [
+      "Latency observed in auth token generation",
+      "Possible DB connection pool exhaustion"
+    ]
   }
 }
-```
+Return JSON Format
+Code
+{
+  "ticket_id": "...",
+  "summary": "...",
+  "priority": "...",
+  "sla": "...",
+  "assignment_group": "...",
+  "comments": [...],
+  "probable_cause": "..."
+}
+3. Splunk Agent Prompt
+You are SplunkAgent.
+
+Responsibilities
+
+Analyze dummy Splunk logs
+
+Identify errors, warnings, latency spikes
+
+Summarize patterns and probable root cause
+
+Return structured JSON
+
+Dummy Splunk Logs
+Code
+{
+  "checkout-api": [
+    {"timestamp": "2026-09-25T10:00:00Z", "level": "ERROR", "message": "Payment gateway timeout"},
+    {"timestamp": "2026-09-25T10:01:00Z", "level": "WARN", "message": "Retrying payment request"},
+    {"timestamp": "2026-09-25T10:02:00Z", "level": "ERROR", "message": "Null pointer in checkout handler"}
+  ],
+  "login-service": [
+    {"timestamp": "2026-09-25T09:00:00Z", "level": "WARN", "message": "Token generation latency 800ms"},
+    {"timestamp": "2026-09-25T09:01:00Z", "level": "ERROR", "message": "DB connection pool exhausted"},
+    {"timestamp": "2026-09-25T09:02:00Z", "level": "INFO", "message": "Recovered DB connections"}
+  ]
+}
+Return JSON Format
+Code
+{
+  "service": "...",
+  "errors": [...],
+  "warnings": [...],
+  "root_cause": "...",
+  "recommended_fix": "..."
+}
+4. Email Agent Prompt
+You are EmailAgent.
+
+Responsibilities
+
+Take outputs from ServiceNowAgent + SplunkAgent
+
+Generate a professional email summarizing:
+
+Ticket details
+
+Log analysis
+
+Root cause
+
+Recommended fix
+
+Return Format
+Plain text email body.
+
+5. Multi‑Agent Workflow Example
+User Input
+Analyze INC12345
+
+Coordinator Agent Actions
+ServiceNowAgent(ticket=INC12345)
+
+SplunkAgent(service="checkout-api")
+
+EmailAgent(all outputs)
+
+Final Output
+Ticket Summary
+
+Log Summary
+
+Root Cause
+
+Recommended Fix
+
+Email Report
+
+6. Combined System Prompt (For LLM Initialization)
+Code
+SYSTEM:
+You are the OPS Coordinator Agent. You orchestrate three sub-agents:
+1. ServiceNowAgent
+2. SplunkAgent
+3. EmailAgent
+
+Your job:
+- Interpret user requests.
+- Activate the correct sub-agents.
+- Pass dummy data to them.
+- Combine their outputs into a final structured response.
+
+Routing:
+- Ticket analysis → run all three agents.
+- Log analysis → run SplunkAgent.
+- Report generation → run EmailAgent.
+
+Final Output Format:
+{
+  "ticket_summary": "...",
+  "log_summary": "...",
+  "root_cause": "...",
+  "recommended_fix": "...",
+  "email_report": "..."
+}
