@@ -1,195 +1,169 @@
-OPS Multi‑Agent System Prompt (PDF‑Ready Layout)
-1. Coordinator Agent Prompt
-You are the OPS Coordinator Agent.
+# OPS Support Coordinator — Project Plan
 
-Responsibilities
+**Status:** Working prototype, demo-ready
+**Owner:** [your name]
+**Last updated:** 2026-09-30
 
-Understand the user request
+---
 
-Decide which sub‑agents must be activated
+## 1. Objective
 
-Pass correct context and dummy data to each sub‑agent
+Build a single assistant that IT ops staff can describe an incident, ticket, or service
+to in plain English, and have it automatically pull the relevant ServiceNow ticket,
+run a Splunk-style log analysis, and draft (and send) an incident email report — without
+the user having to know which system to check first or how to query it.
 
-Combine all sub‑agent outputs into a final structured response
+**Problem it solves:** today, triaging an incident means manually checking ServiceNow,
+then searching Splunk, then writing an email — three separate tools, three separate
+queries, done by hand every time. This collapses that into one conversational request.
 
-Available Sub‑Agents
+## 2. Scope
 
-ServiceNowAgent — ticket analysis
+**In scope (built):**
+- A Claude-powered coordinator that decides which systems to check, per request
+- ServiceNow ticket lookup and summarization
+- Splunk log lookup and root-cause analysis
+- Email drafting and real sending (SMTP)
+- A chat-based frontend
 
-SplunkAgent — log analysis
+**Out of scope (for this phase):**
+- Live ServiceNow / Splunk connections — currently simulated with realistic dummy data
+  (see [Section 6](#6-known-limitations--not-yet-built))
+- User authentication / multi-tenant access control
+- Persisting conversation history or ticket state between requests
 
-EmailAgent — report generation
+## 3. How it works (architecture)
 
-Routing Rules
+```mermaid
+flowchart TD
+    Client([Chatbot UI])
+    FastAPI[FastAPI<br/>POST /analyze]
+    Coordinator[[OPS Coordinator<br/>owns the routing rules]]
+    Claude{{Claude API<br/>claude-sonnet-5}}
+    SN[ServiceNowAgent]
+    SP[SplunkAgent]
+    EM[EmailAgent]
+    Data[(Ticket & log data)]
+    SMTP[/SMTP server/]
 
-“Ticket analysis”, “incident analysis”, “root cause”, “SLA”, or ticket ID → ServiceNowAgent + SplunkAgent + EmailAgent
+    Client -->|"types a request"| FastAPI
+    FastAPI --> Coordinator
+    Coordinator <-.->|tool-use loop| Claude
+    Coordinator -.->|"ticket ID / root cause / SLA"| SN
+    Coordinator -.->|"logs only"| SP
+    Coordinator -.->|"send / prepare report"| EM
+    SN --> Data
+    SP --> Data
+    SN -.->|own Claude call| Claude
+    SP -.->|own Claude call| Claude
+    EM -.->|own Claude call| Claude
+    EM -->|"if a recipient was given"| SMTP
+    Coordinator -->|final structured reply| FastAPI --> Client
+```
 
-“Logs”, “errors”, “latency”, “exceptions” → SplunkAgent
+**The key design point:** there is exactly **one** AI system — the Claude API. The
+"Coordinator" and the three "agents" are not separate AI models; they're plain Python
+functions that each call the same Claude API with a different system prompt. The
+Coordinator's prompt contains the routing rules and decides, per request, which of the
+three agent functions to invoke (via Claude's tool-use / function-calling feature) — this
+is not a fixed if/else pipeline.
 
-“Email report”, “summary”, “send report” → EmailAgent
+## 4. Agent design
 
-Final Output Must Include
+| Agent | Responsibility | Data source today |
+|---|---|---|
+| **OPS Coordinator** | Reads the request, decides which agents to run (per the routing rules below), combines their outputs into one structured reply | — |
+| **ServiceNowAgent** | Looks up a ticket, asks Claude to summarize priority, SLA status, and affected service | Dummy ticket records |
+| **SplunkAgent** | Looks up logs for a service, asks Claude to identify the error pattern and likely root cause | Dummy log entries |
+| **EmailAgent** | Drafts a subject/body with Claude; **sends it via SMTP** if the request included a recipient email address | Ticket/log summaries from the other agents |
 
-Ticket Summary
+**Routing rules** (embedded in the Coordinator's own system prompt — not Python logic):
 
-Log Summary
+| If the request mentions... | Agents activated |
+|---|---|
+| "ticket analysis", "incident analysis", "log analysis", "root cause", "SLA", "error details", or a ticket ID | ServiceNowAgent + SplunkAgent + EmailAgent |
+| Logs only | SplunkAgent only |
+| Sending / preparing a report | EmailAgent (+ whichever agents it needs for content) |
 
-Root Cause
+**Final response shape** (what every request returns):
 
-Recommended Fix
-
-Email Report
-
-2. ServiceNow Agent Prompt
-You are ServiceNowAgent.
-
-Responsibilities
-
-Retrieve ticket details from dummy ServiceNow data
-
-Extract description, assignment group, priority, SLA, comments
-
-Identify probable root cause
-
-Return structured JSON
-
-Dummy ServiceNow Data
-Code
-{
-  "INC12345": {
-    "short_description": "Checkout API failing intermittently",
-    "assignment_group": "Ecommerce-Backend",
-    "priority": "High",
-    "sla": "Breached",
-    "comments": [
-      "User reports 500 errors during checkout",
-      "Issue seems related to payment gateway latency"
-    ]
-  },
-  "INC98765": {
-    "short_description": "Login service slow response",
-    "assignment_group": "Identity-Services",
-    "priority": "Medium",
-    "sla": "On Track",
-    "comments": [
-      "Latency observed in auth token generation",
-      "Possible DB connection pool exhaustion"
-    ]
-  }
-}
-Return JSON Format
-Code
-{
-  "ticket_id": "...",
-  "summary": "...",
-  "priority": "...",
-  "sla": "...",
-  "assignment_group": "...",
-  "comments": [...],
-  "probable_cause": "..."
-}
-3. Splunk Agent Prompt
-You are SplunkAgent.
-
-Responsibilities
-
-Analyze dummy Splunk logs
-
-Identify errors, warnings, latency spikes
-
-Summarize patterns and probable root cause
-
-Return structured JSON
-
-Dummy Splunk Logs
-Code
-{
-  "checkout-api": [
-    {"timestamp": "2026-09-25T10:00:00Z", "level": "ERROR", "message": "Payment gateway timeout"},
-    {"timestamp": "2026-09-25T10:01:00Z", "level": "WARN", "message": "Retrying payment request"},
-    {"timestamp": "2026-09-25T10:02:00Z", "level": "ERROR", "message": "Null pointer in checkout handler"}
-  ],
-  "login-service": [
-    {"timestamp": "2026-09-25T09:00:00Z", "level": "WARN", "message": "Token generation latency 800ms"},
-    {"timestamp": "2026-09-25T09:01:00Z", "level": "ERROR", "message": "DB connection pool exhausted"},
-    {"timestamp": "2026-09-25T09:02:00Z", "level": "INFO", "message": "Recovered DB connections"}
-  ]
-}
-Return JSON Format
-Code
-{
-  "service": "...",
-  "errors": [...],
-  "warnings": [...],
-  "root_cause": "...",
-  "recommended_fix": "..."
-}
-4. Email Agent Prompt
-You are EmailAgent.
-
-Responsibilities
-
-Take outputs from ServiceNowAgent + SplunkAgent
-
-Generate a professional email summarizing:
-
-Ticket details
-
-Log analysis
-
-Root cause
-
-Recommended fix
-
-Return Format
-Plain text email body.
-
-5. Multi‑Agent Workflow Example
-User Input
-Analyze INC12345
-
-Coordinator Agent Actions
-ServiceNowAgent(ticket=INC12345)
-
-SplunkAgent(service="checkout-api")
-
-EmailAgent(all outputs)
-
-Final Output
-Ticket Summary
-
-Log Summary
-
-Root Cause
-
-Recommended Fix
-
-Email Report
-
-6. Combined System Prompt (For LLM Initialization)
-Code
-SYSTEM:
-You are the OPS Coordinator Agent. You orchestrate three sub-agents:
-1. ServiceNowAgent
-2. SplunkAgent
-3. EmailAgent
-
-Your job:
-- Interpret user requests.
-- Activate the correct sub-agents.
-- Pass dummy data to them.
-- Combine their outputs into a final structured response.
-
-Routing:
-- Ticket analysis → run all three agents.
-- Log analysis → run SplunkAgent.
-- Report generation → run EmailAgent.
-
-Final Output Format:
+```json
 {
   "ticket_summary": "...",
-  "log_summary": "...",
-  "root_cause": "...",
+  "log_analysis_summary": "...",
   "recommended_fix": "...",
-  "email_report": "..."
+  "email_report": {
+    "subject": "...",
+    "body": "...",
+    "recipient": "...",
+    "sent": true,
+    "error": null
+  }
 }
+```
+
+## 5. Current status — what's working today
+
+- [x] Coordinator with Claude tool-use loop and routing rules
+- [x] ServiceNowAgent + SplunkAgent + EmailAgent, each an independent Claude call
+- [x] 8 realistic dummy tickets spanning payment, auth, order, notification, inventory,
+      search, shipping, and checkout services, each with matching log data
+- [x] FastAPI backend (`POST /analyze`)
+- [x] Chat-based frontend with example prompts, typing indicator, and inline results
+- [x] Real email sending via SMTP, with a visible sent/not-sent status in the reply
+- [x] Graceful fallback for unknown ticket IDs (no crash, clear "not found" message)
+
+See [`README.md`](./README.md) for full architecture diagrams, file-by-file reference, and
+setup instructions. See [`demo guide`](#7-demo-for-the-team) below to run it live.
+
+## 6. Known limitations / not yet built
+
+- **ServiceNow and Splunk are simulated.** `ServiceNowAgent` and `SplunkAgent` read from
+  `data/dummy_data.py`, not a live ServiceNow or Splunk instance. The intended design for
+  swapping these for real systems (via MCP servers) is documented in `README.md` under
+  "Target architecture" — it requires a ServiceNow MCP server and a Splunk MCP server,
+  neither of which is connected yet.
+- **No access control.** Anyone who can reach the endpoint can request any ticket or send
+  email to any address.
+- **No conversation memory.** Each request is independent; the coordinator doesn't
+  remember earlier messages in the same session.
+- **Email sending needs manual SMTP setup** (e.g. a Gmail App Password) per environment —
+  there's no managed email service wired in yet.
+
+## 7. Demo (for the team)
+
+Suggested prompts to run live, each showing a different behavior:
+
+1. `"Do a root cause analysis on ticket INC0012345 and email me the report"` — shows all
+   three agents activating together.
+2. `"Just show me the splunk logs for search-service"` — shows selective routing (only
+   SplunkAgent runs).
+3. `"Send the incident report for INC0012345 to <test-inbox>"` — shows the email
+   actually being sent, with a visible delivery status.
+4. `"What's the status of ticket INC9999999?"` — shows the graceful fallback for an
+   unknown ticket.
+
+## 8. Proposed next steps
+
+| Priority | Item | Why |
+|---|---|---|
+| High | Connect a real ServiceNow MCP server | Removes dependency on dummy ticket data; the biggest gap between demo and production |
+| High | Connect a real Splunk MCP server | Same reasoning, for log analysis |
+| Medium | Add basic auth / access control to `POST /analyze` | Currently open to anyone who can reach it |
+| Medium | Managed email sending (e.g. a transactional email API) instead of per-environment SMTP setup | Simplifies deployment, improves deliverability |
+| Low | Conversation memory across a session | Lets users ask follow-up questions without repeating the ticket ID |
+
+---
+
+## Appendix: sample data reference
+
+| Ticket ID | Service | Scenario |
+|---|---|---|
+| `INC0012345` | payment-service | Intermittent 500s after a deploy (fraud-check timeout) |
+| `INC0012678` | auth-service | SSO login failures (JWT signature errors) |
+| `INC0013002` | order-service | Order history page loading slowly |
+| `INC0013450` | notification-service | Push notifications delayed 20+ min |
+| `INC0013789` | inventory-service | Stock counts not syncing (warehouse API 429s) |
+| `INC0014021` | search-service | Zero search results (Elasticsearch shard failures) |
+| `INC0014205` | shipping-service | International shipping labels failing |
+| `INC0014502` | checkout-service | Cart emptied after applying a promo code |
